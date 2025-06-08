@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Güvenli Dosya Aktarım Sistemi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <style>
+        .log-box {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            background: #f9f9f9;
+            font-family: monospace;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans">
+    <div class="container mx-auto p-6 max-w-4xl">
+        <h1 class="text-2xl font-bold text-center mb-6 text-gray-800">🔒 Güvenli Dosya Aktarım Sistemi</h1>
+
+        <!-- Tabs -->
+        <div class="flex gap-2 mb-6 border-b">
+            <div class="tab px-4 py-2 bg-blue-500 text-white cursor-pointer hover:bg-blue-600 rounded-t" onclick="showTab('server')">Sunucu</div>
+            <div class="tab px-4 py-2 bg-blue-500 text-white cursor-pointer hover:bg-blue-600 rounded-t" onclick="showTab('client')">İstemci</div>
+            <div class="tab px-4 py-2 bg-blue-500 text-white cursor-pointer hover:bg-blue-600 rounded-t" onclick="showTab('performance')">Performans</div>
+            <div class="tab px-4 py-2 bg-blue-500 text-white cursor-pointer hover:bg-blue-600 rounded-t" onclick="showTab('security')">Güvenlik</div>
+        </div>
+
+        <!-- Server Tab -->
+        <div id="server" class="tab-content bg-white p-6 rounded shadow">
+            <h2 class="text-xl font-semibold mb-4">Sunucu Kontrolü</h2>
+            <div class="flex gap-4 mb-4">
+                <label class="flex items-center gap-2">
+                    Port: <input id="server-port" type="number" value="12345" class="border p-2 rounded w-24">
+                </label>
+                <button onclick="startServer()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Sunucuyu Başlat</button>
+                <button onclick="stopServer()" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">Sunucuyu Durdur</button>
+            </div>
+            <h3 class="font-semibold mb-2">Sunucu Logları</h3>
+            <div id="server-logs" class="log-box"></div>
+        </div>
+
+        <!-- Client Tab -->
+        <div id="client" class="tab-content hidden bg-white p-6 rounded shadow">
+            <h2 class="text-xl font-semibold mb-4">Dosya Gönder</h2>
+            <form id="file-form" class="space-y-4">
+                <label class="block">
+                    Sunucu IP: <input id="server-ip" name="server_ip" type="text" value="127.0.0.1" class="border p-2 rounded w-full">
+                </label>
+                <label class="block">
+                    Port: <input id="client-port" name="port" type="number" value="12345" class="border p-2 rounded w-full">
+                </label>
+                <label class="block">
+                    Kullanıcı Adı: <input id="username" name="username" type="text" value="admin" class="border p-2 rounded w-full">
+                </label>
+                <label class="block">
+                    Şifre: <input id="password" name="password" type="password" value="password123" class="border p-2 rounded w-full">
+                </label>
+                <label class="block">
+                    Dosya Seç: <input id="file-input" name="file" type="file" class="border p-2 rounded w-full">
+                </label>
+                <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Dosya Gönder</button>
+            </form>
+            <h3 class="font-semibold mt-4 mb-2">İstemci Logları</h3>
+            <div id="client-logs" class="log-box"></div>
+        </div>
+
+        <!-- Performance Tab -->
+        <div id="performance" class="tab-content hidden bg-white p-6 rounded shadow">
+            <h2 class="text-xl font-semibold mb-4">Performans Metrikleri</h2>
+            <button onclick="runPerformanceTest()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 mb-4">Performans Testi Çalıştır</button>
+            <ul class="grid grid-cols-2 gap-4">
+                <li>Bant Genişliği (Mbps): <span id="bandwidth">-</span></li>
+                <li>Ortalama RTT (ms): <span id="rtt">-</span></li>
+                <li>Paket Kaybı (%): <span id="packet-loss">-</span></li>
+                <li>Transfer Süresi (sn): <span id="transfer-time">-</span></li>
+            </ul>
+            <h3 class="font-semibold mt-4 mb-2">Performans Logları</h3>
+            <div id="performance-logs" class="log-box"></div>
+        </div>
+
+        <!-- Security Tab -->
+        <div id="security" class="tab-content hidden bg-white p-6 rounded shadow">
+            <h2 class="text-xl font-semibold mb-4">Güvenlik Testleri</h2>
+            <button onclick="runSecurityTest()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 mb-4">Güvenlik Testi Çalıştır</button>
+            <h3 class="font-semibold mb-2">Güvenlik Logları</h3>
+            <div id="security-logs" class="log-box"></div>
+        </div>
+
+    </div>
+
+    <script>
+        // Tab switching
+        function showTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
+            document.getElementById(tabId).classList.remove('hidden');
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('bg-blue-600'));
+            document.querySelector(`.tab[onclick="showTab('${tabId}')"]`).classList.add('bg-blue-600');
+        }
+
+        // Show server tab by default
+        showTab('server');
+
+        // Toast notification
+        function showToast(message, isError = false) {
+            Toastify({
+                text: message,
+                duration: 3000,
+                close: true,
+                gravity: "top",
+                position: "right",
+                backgroundColor: isError ? "#e53e3e" : "#38a169",
+            }).showToast();
+        }
+
+        // WebSocket setup with Socket.IO
+        const socket = io('http://localhost:5000', { transports: ['websocket'] });
+        socket.on('connect', () => {
+            console.log('WebSocket connected');
+            showToast('WebSocket bağlantısı kuruldu!');
+        });
+        socket.on('connect_error', (error) => {
+            console.error('WebSocket connection error:', error);
+            showToast('WebSocket bağlantısı başarısız, polling kullanılıyor.', true);
+            startPolling(); // Fallback to polling
+        });
+        socket.on('logs', (data) => {
+            console.log('Received logs:', data);
+            document.getElementById('server-logs').innerHTML = data.server_logs.join('<br>') || 'Log yok';
+            document.getElementById('client-logs').innerHTML = data.client_logs.join('<br>') || 'Log yok';
+            document.getElementById('performance-logs').innerHTML = data.performance_logs.join('<br>') || 'Log yok';
+            document.getElementById('security-logs').innerHTML = data.security_logs.join('<br>') || 'Log yok';
+        });
+
+        // Fallback polling for logs
+        function startPolling() {
+            async function fetchLogs() {
+                try {
+                    const response = await fetch('/get-logs');
+                    const logs = await response.json();
+                    console.log('Fetched logs via polling:', logs);
+                    document.getElementById('server-logs').innerHTML = logs.server_logs.join('<br>') || 'Log yok';
+                    document.getElementById('client-logs').innerHTML = logs.client_logs.join('<br>') || 'Log yok';
+                    document.getElementById('performance-logs').innerHTML = logs.performance_logs.join('<br>') || 'Log yok';
+                    document.getElementById('security-logs').innerHTML = logs.security_logs.join('<br>') || 'Log yok';
+                } catch (error) {
+                    console.error('Polling error:', error);
+                }
+            }
+            fetchLogs();
+            setInterval(fetchLogs, 5000); // Poll every 5 seconds
+        }
+
+        // Server control
+        async function startServer() {
+            const port = document.getElementById('server-port').value;
+            const response = await fetch('/start-server', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ port: parseInt(port) })
+            });
+            const result = await response.json();
+            showToast(result.success ? "Sunucu başlatıldı!" : result.error, !result.success);
+        }
+
+        async function stopServer() {
+            const response = await fetch('/stop-server', { method: 'POST' });
+            const result = await response.json();
+            showToast(result.success ? "Sunucu durduruldu!" : result.error, !result.success);
+        }
+
+        // File transfer
+        document.getElementById('file-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const response = await fetch('/send-file', { method: 'POST', body: formData });
+            const result = await response.json();
+            showToast(result.success ? `Dosya gönderildi! Hash: ${result.hash}` : `Hata: ${result.error}`, !result.success);
+        });
+
+        // Performance test
+        async function runPerformanceTest() {
+            const response = await fetch('/run-performance-test', { method: 'POST' });
+            const result = await response.json();
+            if (result.success) {
+                document.getElementById('bandwidth').textContent = result.metrics.bandwidth_mbps;
+                document.getElementById('rtt').textContent = result.metrics.avg_rtt_ms;
+                document.getElementById('packet-loss').textContent = result.metrics.packet_loss_percent;
+                document.getElementById('transfer-time').textContent = result.metrics.duration_sec;
+                showToast("Performans testi tamamlandı!");
+            } else {
+                showToast("Performans testi başarısız!", true);
+            }
+        }
+
+        // Security test
+        async function runSecurityTest() {
+            const response = await fetch('/run-security-test', { method: 'POST' });
+            const result = await response.json();
+            showToast(result.success ? `Güvenlik testi tamamlandı! ${result.total_incidents} olay tespit edildi.` : "Güvenlik testi başarısız!", !result.success);
+        }
+    </script>
+</body>
+</html>
