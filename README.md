@@ -44,7 +44,7 @@ Bu proje, güvenli dosya aktarımı için geliştirilmiş kapsamlı bir sistem o
 ### 1. Depoyu Klonlayın
 ```bash
 git clone <repository-url>
-cd secure-file-transfer-system
+cd btu-web
 ```
 
 ### 2. Sanal Ortam Oluşturun ve Aktifleştirin
